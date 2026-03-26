@@ -7,6 +7,11 @@ function WeatherApp(apiKey) {
     this.cityInput = document.getElementById("city-input");
     this.weatherDisplay = document.getElementById("weather-display");
 
+    // ✅ NEW (recent searches)
+    this.recentContainer = document.getElementById("recent-searches-container");
+    this.recentSearches = [];
+    this.maxRecent = 5;
+
     this.init();
 }
 
@@ -20,7 +25,13 @@ WeatherApp.prototype.init = function () {
         }
     });
 
-    this.showWelcome();
+    // ✅ LOAD FEATURES
+    this.loadRecent();
+    this.loadLastCity();
+
+    if (!localStorage.getItem('lastCity')) {
+        this.showWelcome();
+    }
 };
 
 // HANDLE SEARCH
@@ -35,28 +46,87 @@ WeatherApp.prototype.handleSearch = function () {
     this.getWeather(city);
 };
 
-// GET WEATHER (FIXED VERSION 🔥)
+// GET WEATHER
 WeatherApp.prototype.getWeather = async function (city) {
     this.showLoading();
 
     try {
-        // ✅ Current weather
         const current = await axios.get(
             `${this.apiUrl}?q=${city}&appid=${this.apiKey}&units=metric`
         );
 
         this.displayWeather(current.data);
 
-        // ✅ Try forecast separately
+        // ✅ SAVE LAST CITY
+        localStorage.setItem('lastCity', city);
+
+        // ✅ SAVE RECENT SEARCH
+        this.saveRecentSearch(city);
+
         try {
             const forecast = await this.getForecast(city);
             this.displayForecast(forecast);
         } catch (e) {
-            console.log("Forecast failed, but weather shown");
+            console.log("Forecast failed");
         }
 
     } catch (error) {
         this.showError("City not found");
+    }
+};
+
+// ✅ SAVE RECENT
+WeatherApp.prototype.saveRecentSearch = function (city) {
+    const name = city.toLowerCase();
+
+    this.recentSearches = this.recentSearches.filter(c => c !== name);
+    this.recentSearches.unshift(name);
+
+    if (this.recentSearches.length > this.maxRecent) {
+        this.recentSearches.pop();
+    }
+
+    localStorage.setItem('recent', JSON.stringify(this.recentSearches));
+
+    this.displayRecent();
+};
+
+// ✅ LOAD RECENT
+WeatherApp.prototype.loadRecent = function () {
+    const data = localStorage.getItem('recent');
+
+    if (data) {
+        this.recentSearches = JSON.parse(data);
+        this.displayRecent();
+    }
+};
+
+// ✅ DISPLAY BUTTONS
+WeatherApp.prototype.displayRecent = function () {
+    if (!this.recentContainer) return;
+
+    this.recentContainer.innerHTML = "";
+
+    this.recentSearches.forEach(city => {
+        const btn = document.createElement("button");
+        btn.textContent = city;
+        btn.className = "recent-btn";
+
+        btn.onclick = () => {
+            this.cityInput.value = city;
+            this.getWeather(city);
+        };
+
+        this.recentContainer.appendChild(btn);
+    });
+};
+
+// LOAD LAST CITY
+WeatherApp.prototype.loadLastCity = function () {
+    const lastCity = localStorage.getItem('lastCity');
+
+    if (lastCity) {
+        this.getWeather(lastCity);
     }
 };
 
